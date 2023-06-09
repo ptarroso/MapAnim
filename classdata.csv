@@ -1,0 +1,16 @@
+value,description,color,target_x,target_y
+100,Artificializado,#e31a1c,6500,1000
+211,Culturas anuais de\noutono/inverno,#eba000,6500,3000
+212,Culturas anuais de\nprimavera/verão,#9effe4,12500,3000
+213,Outras áreas\nagrícolas,#f9f100,6500,6000
+311,Sobreiro e\nAzinheira,#9f218a,12500,6000
+312,Eucalipto,#2bf100,14500,6000
+313,Outras folhosas,#12c309,8500,3000
+321,Pinheiro bravo,#0c8006,10500,3000
+322,Pinheiro manso,#174e11,10500,1000
+323,Outras resinosas,#1e636f,14500,1000
+410,Matos,#6f5e1a,8500,6000
+420,Vegetação\nherbácea\nespontânea,#d6cc90,10500,6000
+500,Superfícies\nsem vegetação,#787878,8500,1000
+610,Zonas húmidas,#1973a7,12500,1000
+620,Água,#362ecc,14500,3000
