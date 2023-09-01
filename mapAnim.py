@@ -1,10 +1,45 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+"""
+Raster Map Animation
+
+This script serves as a data visualization tool for categorical raster maps.
+It animates pixels with data into tightly packed spirals, providing a visually
+appealing representation of the proportions of each class. The script allows
+users to fine-tune various parameters and incorporate map elements and labels
+through user-defined text files.
+
+Author: Pedro Tarroso
+Date: August 30, 2023
+
+License: GNU General Public License (GPL)
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+"""
+
+import json
 from osgeo import gdal
 from matplotlib import pyplot as plt
 from matplotlib import font_manager as fm
 import numpy as np
 from matplotlib.colors import BoundaryNorm, ListedColormap
 from math import ceil
+import argparse
 
+# To avoid FutureWarning
+gdal.DontUseExceptions()
 
 class MapClass():
     """
@@ -161,6 +196,7 @@ class MapClass():
         tolerance. If the distance is less than or equal to the tolerance, the
         point is considered to have reached its target position and the method
         stops moving that point.
+        Returns the number of non-moving pixels.
         """
         s = self.size
         self.calcDist()
@@ -234,7 +270,7 @@ class MapCollection():
         nodata: nodata value to be used (defaults to 0)
         rtype: data type of the array to be extracted from raster
         """
-        raster = gdal.Open(filepath)
+        raster = gdal.Open(filename)
         rst = raster.ReadAsArray().astype(rtype)
         return cls(rst, nodata)
     
@@ -371,7 +407,7 @@ def resample_raster(raster_path, factor):
             # Remove no data
             input_data = input_data[input_data != nodata]
             if len(input_data) > 0:
-                # Apply the user-specified function to the input data
+                # Apply the summarising function to the input data
                 values, counts = np.unique(input_data, return_counts=True)
                 ind = np.argmax(counts)
                 arr[i][j] = values[ind]
@@ -383,183 +419,414 @@ def resample_raster(raster_path, factor):
     print()
     return([arr, p, nodata])
 
+class DataDescriptor:
+    """
+    The DataDescriptor class is designed to manage descriptions, color codes, 
+    and targets associated with each class value. This class offers methods 
+    for adding new classes and retrieving essential information from each data
+    class. Additionally, it includes a method to simplify the process of 
+    extracting class descriptions from a CSV file."
+    """
 
-descr = ["Artificializado", "Culturas anuais de\noutono/inverno", 
-         "Culturas anuais de\nprimavera/verão", "Outras áreas\nagrícolas", 
-         "Sobreiro e\nAzinheira", "Eucalipto", "Outras folhosas", 
-         "Pinheiro bravo", "Pinheiro manso", "Outras resinosas", "Matos", 
-         "Vegetação\nherbácea\nespontânea", "Superfícies\nsem vegetação", 
-         "Zonas húmidas", "Água"]
+    def __init__(self):
+        self.cls = []
+        self.descr = []
+        self.colors = []
+        self.targets = []
+    
+    def addClass(self, cls, descr, color, target):
+        """
+        Adds a class with relvant and mandatory associated data.
+        """
+        if cls not in self.cls:
+            self.cls.append(int(cls))
+            self.descr.append(descr.replace('\\n', '\n'))
+            self.colors.append(color)
+            self.targets.append([int(x) for x in target])
+        else:
+            raise ValueError(f"Can't add {cls} because it is already available.")
 
-colors = ["#e31a1c", "#eba000", "#9effe4", "#f9f100", "#9f218a", "#2bf100",
-          "#12c309", "#0c8006", "#174e11", "#1e636f", "#6f5e1a", "#d6cc90",
-          "#787878", "#1973a7", "#362ecc"]
+    @classmethod
+    def fromfile(cls, filename):
+        """
+        This class method enables the creation of a DataDescriptor object from
+        a CSV file. The CSV file should be comma-separated and contain the 
+        following fields: 
+            [value, description, color, target_x, target_y]
+        including a header row. While the order of the fields is flexible, it's
+        important to use these exact field names for successful data extraction.
+        """
+        header = True
+        order = ["value", "description", "color", "target_x", "target_y"]
+        dd = cls()
+        with open(filename, "r") as stream:
+            for line in stream:
+                line = line.strip().split(",")
+                if header:
+                    try:
+                        line = [x.lower() for x in line]
+                        i = [line.index(x) for x in order]
+                        header = False
+                    except ValueError as err:
+                        print(err)
+                else:
+                    dd.addClass(line[i[0]], line[1], line[2], line[3:5])
+        return dd
+    
+    def getSize(self):
+        """ Get the number of available classes."""
+        return len(self.cls)
 
-cls = [100, 211, 212, 213, 311, 312, 313, 321, 322, 323, 410, 420, 500, 610,
-       620]
+    def classExists(self, cls):
+        """ Test if a particular class exists."""
+        if cls in self.cls:
+            return True
+        else:
+            raise ValueError(f"Class {cls} not available.")
+
+    def getClass_by_index(self, i):
+        """ Get the class name by its index."""
+        if i < self.getSize():
+            return self.cls[i]
+
+    def modifyClass(self, cls, descr=None, color=None, target=None):
+        """ Method for modifying an existing class."""
+        if self.classExists(cls):
+            i = self.cls.index(cls)
+            if descr:
+                self.descr[i] = descr
+            if color:
+                self.color[i] = color
+            if target:
+                self.targets[i] = target
+
+    def rmClass(self, cls):
+        """ Method for removing an existing class."""
+        if self.classExists(cls):
+            i = self.cls.index(cls)
+            self.cls.pop(i)
+            self.descr.pop(i)
+            self.color.pop(i)
+            self.targets.pop(i)
+
+    def getDescriptor(self, cls):
+        """ Get the description of an existing class. """
+        if self.classExists(cls):
+            i = self.cls.index(cls)
+            return(self.descr[i])
+
+    def getColor(self, cls):
+        """ Get the color of an existing class. """
+        if self.classExists(cls):
+            i = self.cls.index(cls)
+            return(self.colors[i])
+    
+    def getTarget(self, cls):
+        """ Get the target of an existing class. """
+        if self.classExists(cls):
+            i = self.cls.index(cls)
+            return(self.targets[i])
+
+class ElementsPlot():
+    """
+    The ElementsPlot class serves as a container for storing additional 
+    elements intended for display on a map. These elements may include text,
+    lines, as well as features such as scale bars and north arrow.
+    It provides a class method for easy build from JSON file.
+    """
+    def __init__(self):
+        self.elems = []
+
+    def addText(self, x, y, label, params={}):
+        """ 
+        Adds a text element at (x,y). 
+        'Params' is a dict with relevant plotting parameters for text 
+        (e.g. fontsize).
+        """
+        self.elems.append({"type": "text",
+                           "x": x,
+                           "y": y,
+                           "label": label,
+                           "params": params
+                           })
+
+    def addLine(self, x, y, params={}):
+        """ 
+        Adds a line element at (x,y). 
+        'Params' is a dict with relevant plotting parameters for lines
+        (e.g. linewidth).
+        """
+        self.elems.append({"type": "line",
+                           "x": x,
+                           "y": y,
+                           "params": params
+                           })
+    
+    def addScalebar(self, label, x, y, xsize, ysize, params={}):
+        """ 
+        Adds a scale bar element at (x,y) with user defined size. 
+        'Params' is a dict with relevant plotting parameters for scalebar
+        (e.g. linewidth, fontsize).
+        """
+        self.elems.append({"type": "scalebar",
+                           "label": label,
+                           "x": x,
+                           "y": y,
+                           "xsize": xsize,
+                           "ysize": ysize,
+                           "params": params
+                           })
+        
+    def addNortharrow(self, x, y, size, params={}):
+        """
+        Adds a north arrow element at (x,y) with user defined size. 
+        'Params' is a dict with relevant plotting parameters for northarrow
+        (e.g. linewidth, fontsize).
+        """
+        self.elems.append({"type": "northarrow",
+                           "x": x,
+                           "y": y,
+                           "size": size,
+                           "params": params
+                           })
+
+    def addClasslabel(self, x, y, label, params={}):
+        """
+        Adds a class label ellement at (x,y). 
+        'Params' is a dict with relevant plotting parameters for text
+        (e.g. fontsize).
+        """
+        self.elems.append({"type": "classlabel",
+                           "x": x,
+                           "y": y,
+                           "label": label,
+                           "params": params
+                           })
+    @classmethod
+    def fromJSON(cls, filename):
+        """
+        This class method facilitates the creation of an ElementsPlot object 
+        from a well-structured JSON file. The JSON file should adhere to a 
+        specific format that includes relevant properties. Please refer to the
+        provided example for the correct format and to identify commonly used 
+        elements.
+        """
+        with open(filename, "r") as stream:
+            elems = json.load(stream)
+        for e in elems:
+            if e["params"]:
+                if "fontproperties" in e["params"]:
+                    font = e["params"]["fontproperties"]
+                    e["params"]["fontproperties"] = fm.FontProperties(fname=font)
+        e = cls()
+        e.elems = elems
+        return e
+    
+    def plot_elements(self):
+        """ Plots all elements with the exception of 'classlabels'."""
+        for e in self.elems:
+            if e["type"] == "text":
+                plt.text(e["x"], e["y"], e["label"], **e["params"])
+            elif e["type"] == "line":
+                plt.plot(e["x"], e["y"], **e["params"])
+            elif e["type"] == "scalebar":
+                x = e["x"]
+                y = e["y"]
+                xs = e["xsize"]
+                ys = e["ysize"]
+                plt_params = {key: value for key, value in e["params"].items() if key in ["color", "linewidth"]}
+                plt.plot([x, x+xs], [y, y], **plt_params)
+                plt.plot([x, x], [y-ys, y+ys], **plt_params)
+                plt.plot([x+xs, x+xs], [y-ys, y+ys], **plt_params)
+                txt_params = {key: value for key, value in e["params"].items() if key in ["color", "fontsize", "fontproperties"]}
+                plt.text(x+xs/2, y*1.1, e["label"], horizontalalignment="center", **txt_params)
+            elif e["type"] == "northarrow":
+                xa = e["x"]
+                ya = e["y"]
+                sa = e["size"]
+                fill_params = {key: value for key, value in e["params"].items() if key in ["color"]}
+                plt.fill([xa-sa*0.375, xa, xa], [ya, ya+sa, ya], **fill_params)
+                plt_params = {key: value for key, value in e["params"].items() if key in ["color", "linewidth"]}
+                plt.plot([xa, xa+sa*0.375, xa], [ya, ya, ya+sa], **plt_params)
+                txt_params = {key: value for key, value in e["params"].items() if key in ["color", "fontsize", "fontproperties"]}
+                plt.text(xa, ya+sa*1.25, "N", horizontalalignment="center", **txt_params)
+
+    def plot_classlabels(self, lbl, pos = [0,0], alpha=0):
+        """
+        Plots all available class labels. It allows to control transparency
+        of each label for animation purposes.
+        """
+        for e in self.elems:
+            if e["type"] == "classlabel":
+                x = pos[0] + e["x"]
+                y = pos[1] + e["y"]
+                plt.text(x, y, lbl, alpha=alpha, **e["params"])
 
 
-filepath = r"COSsim2021/COSsim_2021_N3_v0_TM06.tif"
+def main(raster_file, arc, iarc, inner_n, width, height, xlim, ylim, elem_file,
+         class_file, burnin, burnout, fadein, magfactor, accel, outdir, 
+         resample=None):
+    """ The main function that reads data, animates and exports each frame."""
 
+    # Read the elements
+    elems = ElementsPlot.fromJSON(elem_file)
 
-#######################
-#dp = MapCollection.fromrasterfile(filepath)
+    # Read the parameters
+    dd = DataDescriptor.fromfile(class_file)
 
-#Resize to fit image map
-dt, p, nodata = resample_raster(filepath, 8)
-dp = MapCollection(dt, dt[0][0])
-dp.setColors(cls, colors)
-
-
-# Add targets
-targets = [[ 6500, 1000], [ 6500, 3000], [12500, 3000], 
-           [ 6500, 6000], [12500, 6000], [14500, 6000], 
-           [ 8500, 3000], [10500, 3000], [10500, 1000], 
-           [14500, 1000], [ 8500, 6000], [10500, 6000],
-           [ 8500, 1000], [12500, 1000], [14500, 3000]]
-
-
-
-
-
-# set targets
-inner_n = 5000
-for i in range(len(cls)):
-    cl = cls[i]
-    print(cl)
-    n = dp.getClass(cl).getSize()
-    if n > inner_n:
-        outer_n = ceil(n / inner_n)
-        bs = spiral(outer_n, np.array(targets[i]), 55, 55)
-        ts = [np.zeros(n), np.zeros(n)]
-        start =  0
-        j = 0
-        for end in range(inner_n, n, inner_n):
-            s = spiral(inner_n, [bs[0][j], bs[1][j]], 0.5, 0.5)
-            ts[0][start:end] = s[0]
-            ts[1][start:end] = s[1]
-            j += 1
-            start = end
-        if end < n:
-            s = spiral(n-end,  [bs[0][j], bs[1][j]], 0.5, 0.5)
-            ts[0][end:n] = s[0]
-            ts[1][end:n] = s[1]
+    # Read the raster
+    if resample:
+        dt, p, nodata = resample_raster(raster_file, resample)
+        dp = MapCollection(dt, dt[0][0])
+        ppx = [(p[cl][p[cl] != nodata]).sum() for cl in dd.cls]
+        percent = [x/sum(ppx)*100 for x in ppx]
+        totalpx = [dp.getClass(cl).size for cl in dd.cls]
     else:
-        ts = spiral(n, np.array(targets[i]), 0.5, 0.5)
-    dp.setTarget(cl, ts, targets[i])
+        dp = MapCollection.fromrasterfile(raster_file)
+        totalpx = [dp.getClass(cl).size for cl in dd.cls]
+        percent = [x/sum(totalpx)*100 for x in totalpx]
 
-# Because the orignal map was aggregated to a lower resolution, to mantain the
-# original percentages I have to use the proportion occupied in each pixel
+    dp.setColors(dd.cls, dd.colors)
 
-#totalpx = [dp.getClass(cl).size for cl in cls]
-#percent = [x/sum(totalpx)*100 for x in totalpx]
-
-ppx = [(p[cl][p[cl] != nodata]).sum() for cl in cls]
-percent = [x/sum(ppx)*100 for x in ppx]
-
-fbold = fm.FontProperties(fname="./Montserrat-SemiBold.ttf")
-flight = fm.FontProperties(fname="./Montserrat-Light.ttf")
-
-totalpx = [dp.getClass(cl).size for cl in cls]
-
-plotlabels = [False for x in range(len(cls))]
-showmap = None
-
-figratio = 16/9 #155/80
-width = 38.40 
-
-outdir = "img"
-flag = True
-frame = 1
-
-while flag:
-    fname = f'{outdir}/{frame:06}.png'
-    
-    plt.style.use('dark_background')
-    fig = plt.figure(figsize=(width, width/figratio), dpi=100)
-    
-    # Title
-    plt.text(7750, 7950, " ".join("Ocupação do Solo de"), alpha=1, 
-             horizontalalignment='center', color="white", fontsize=50, 
-             fontproperties=flight)
-    plt.text(7750, 7450, " ".join("PORTUGAL CONTINENTAL"), alpha=1,
-             horizontalalignment='center', color="white", fontsize=80, 
-             fontproperties=fbold)
-    lx = [7750-5800, 7750+5800]
-    ly = [7400, 7400]
-    plt.plot(lx, ly, linewidth=1, color="white")
-    
-    # Source and author
-    plt.text(2750, 0, "Fonte: COSsim 2021\nAutor: Pedro Tarroso", alpha=1,
-             color="white", fontsize=20, fontproperties=fbold)
-    
-    # Scale bar
-    xs = 2750 #X coordinate scale
-    ys = 350  #Y coordinate scale
-    plt.plot([xs, xs+1250], [ys, ys], linewidth=2, color="white")
-    plt.plot([xs, xs], [ys-50, ys+50], linewidth=2, color="white")
-    plt.plot([xs+1250, xs+1250], [ys-50, ys+50], linewidth=2, color="white")
-    plt.text(xs+1250/2, 375, "100 km", horizontalalignment='center',
-             color="white", fontsize=20, fontproperties=fbold)
-    
-    # North Arrow
-    xa = 2500 #X coordinate north arrow
-    ya = 0    #Y coordinate north arrow
-    sa = 300  #Size north arrow
-    plt.fill([xa-sa*0.375, xa, xa], [ya, ya+sa, ya], color="white", linewidth=2)
-    plt.plot([xa, xa+sa*0.375, xa], [ya, ya, ya+sa], color="white", linewidth=2)
-    plt.text(xa, ya+sa*1.25, "N", horizontalalignment='center',
-             color="white", fontsize=20, fontproperties=fbold)
-    
-    # Plot class labels with alpha related to pixels on target
-    for i in range(len(cls)):
-        alpha = plotlabels[i] / totalpx[i]
-        if percent[i] > 0.1:
-            lbl = "{0}\n({1:.1f}%)".format(descr[i], percent[i])
+    # Set the targets in the spiral for each pixel
+    for i in range(dd.getSize()):
+        print("Setting targets for each pixel/class: %3.1f%%" % ((i+1)/dd.getSize()*100), end = "\r")
+        cl = dd.getClass_by_index(i)
+        n = dp.getClass(cl).getSize()
+        target = dd.getTarget(cl)
+        if n > inner_n:
+            outer_n = ceil(n / inner_n)
+            bs = spiral(outer_n, np.array(target), arc, arc)
+            ts = [np.zeros(n), np.zeros(n)]
+            start =  0
+            j = 0
+            for end in range(inner_n, n, inner_n):
+                s = spiral(inner_n, [bs[0][j], bs[1][j]], iarc, iarc)
+                ts[0][start:end] = s[0]
+                ts[1][start:end] = s[1]
+                j += 1
+                start = end
+            if end < n:
+                s = spiral(n-end,  [bs[0][j], bs[1][j]], iarc, iarc)
+                ts[0][end:n] = s[0]
+                ts[1][end:n] = s[1]
         else:
-            val = 1/10**lead_zeros(percent[i])
-            lbl = "{0}\n(<{1}%)".format(descr[i], val)
-        x,y = targets[i]
-        plt.text(x, y-1350, lbl, alpha=alpha, horizontalalignment='center',
-                 color="white", fontsize=24, fontproperties=fbold)
-    
-    for i in range(len(cls)):
-        dt = dp.getClass(cls[i])
-        x,y = dt.getCoords()
-        col = dt.getColor()
-        plt.scatter(x, y, s=0.005, c = col, zorder=100)
-    
-    # Replot original map when transition is over
-    if sum(plotlabels) / sum(totalpx) > 0.9995:
-        if showmap is None:
-            showmap = frame
-        else:
-            alpha = (frame-showmap) / 150
-            if alpha > 1:
-                alpha = 1
-            for cl in dp.getClasses():
-                dt = dp.getClass(cl)
-                x,y = dt.getOriginalCoords()
-                col = dt.getColor()
-                plt.scatter(x, y, s=0.005, c = col, alpha=alpha)
-    
-    axes=plt.gca()
-    axes.set_xlim([0, 15500])
-    axes.set_ylim([0, 8000])
-    axes.set_aspect("equal")
-    axes.axis("off")
-    plt.tight_layout()
-    plt.savefig(fname) #, transparent=True)
-    plt.close(fig)
-    frame += 1
-    
-    
-    # Start moving after frame 50
-    mag = 1
-    if frame < 300:
-        mag = (frame-50)/250
-    if frame > 50:
-        for i in range(len(cls)):
-            plotlabels[i] = dp.getClass(cls[i]).move(mag, tol=0.001)
+            ts = spiral(n, np.array(target), iarc, iarc)
+        dp.setTarget(cl, ts, target)
+    print()
+
+    plotlabels = [False for x in range(dd.getSize())]
+    showmap = None
+    flag = True
+    frame = 1
+    amode = "Burn-in"
+    # Animate
+    while flag:
+        fname = f'{outdir}/{frame:06}.png'
+        
+        plt.style.use('dark_background')
+        fig = plt.figure(figsize=(width/100, height/100), dpi=100)
+        
+        elems.plot_elements()
+        
+        # Plot class labels with alpha related to pixels on target
+        for i in range(dd.getSize()):
+            cl = dd.getClass_by_index(i)
+            alpha = plotlabels[i] / totalpx[i]
+            if percent[i] > 0.1:
+                lbl = "{0}\n({1:.1f}%)".format(dd.getDescriptor(cl), percent[i])
+            else:
+                val = 1/10**lead_zeros(percent[i])
+                lbl = "{0}\n(<{1}%)".format(dd.getDescriptor(cl), val)
+            elems.plot_classlabels(lbl, dd.getTarget(cl), alpha=alpha)
+        
+        for i in range(dd.getSize()):
+            dt = dp.getClass(dd.cls[i])
+            x,y = dt.getCoords()
+            col = dt.getColor()
+            plt.scatter(x, y, s=0.005, c = col, zorder=100)
+        
+        # Replot original map when transition is over
+        active_pixels = 1 - sum(plotlabels) / sum(totalpx)
+        if  active_pixels < 0.0005:
+            amode = "Finishing"
+            if showmap is None:
+                showmap = frame
+            else:
+                alpha = (frame-showmap) / fadein
+                if alpha > 1:
+                    alpha = 1
+                for cl in dp.getClasses():
+                    dt = dp.getClass(cl)
+                    x,y = dt.getOriginalCoords()
+                    col = dt.getColor()
+                    plt.scatter(x, y, s=0.005, c = col, alpha=alpha)
+                if frame > showmap + burnout + fadein:
+                    flag = False
+        
+        axes=plt.gca()
+        axes.set_xlim(xlim)
+        axes.set_ylim(ylim)
+        axes.set_aspect("equal")
+        axes.axis("off")
+        plt.tight_layout()
+        plt.savefig(fname) #, transparent=True)
+        plt.close(fig)
+
+        print(f"{amode} | Frame: {frame} | Active pixels: {active_pixels*100:.2f}%", end = "\r")
+
+        frame += 1
+        
+        # Start moving after burnin
+        if frame < (accel + burnin):
+            mag = ((frame-burnin)/accel) * magfactor
+        if frame > burnin:
+            amode = "Animating"
+            for i in range(dd.getSize()):
+                cl = dd.getClass_by_index(i)
+                plotlabels[i] = dp.getClass(cl).move(mag, tol=0.001)
+    print()
+
+# Comand line argument parser
+parser = argparse.ArgumentParser()
+parser.add_argument("raster", type=str,
+                    help="The input raster map with integer classes (TIF format).")
+parser.add_argument("classdata", type=str,
+                    help="The class information for each of the classes in the raster (CSV format).")
+parser.add_argument("elements", type=str,
+                    help="The extra elements to plot (json format).")
+parser.add_argument("outdir", type=str,
+                    help="The output directory to save each frame.")
+parser.add_argument("-s", "--size", nargs=2, type=int, default= [1920, 1080],
+                    help="The output figure given as 'width height'.")
+parser.add_argument("-x", "--xlim", nargs=2, type=int, default=[0, 15500],
+                    help="The limits for X axis in pixels. Note that position of elements are using this axis.")
+parser.add_argument("-y", "--ylim", nargs=2, type=int, default=[0, 8000],
+                    help="The limits for Y axis in pixels. Note that position of elements are using this axis.")
+parser.add_argument("-bi", "--burnin", type=int, default=50,
+                    help="Number of frames without movement in the begining of the animation.")
+parser.add_argument("-bo", "--burnout", type=int, default=50,
+                    help="Number of frames without movement at the end of the animation.")
+parser.add_argument("-f", "--fadein", type=int, default=150,
+                    help="Number of frames for fade in the original raster in the map.")
+parser.add_argument("-m", "--mfactor", type=float, default=1.0,
+                    help="Magnitude factor for the movement of each pixel (higher value implies faster movement)")
+parser.add_argument("-a", "--accel", type=int, default=250,
+                    help="Number of frames for movement accelaration at the begining of the animation.")
+parser.add_argument("-i", "--innern", type=int, default=5000,
+                    help="Number of points of the inner spiral (each dot of the main spiral).")
+parser.add_argument("-r", "--resample", type=int,
+                    help="Sets the resampling factor for downscaling the raster.")
+parser.add_argument("-oa", "--arc", type=float, default=55,
+                    help="Controls the outer spiral arc and separation.")
+parser.add_argument("-ia", "--iarc", type=float, default=0.5,
+                    help="Controls the inner spiral arc and separation.")
+args = parser.parse_args()
 
 
+if __name__ == "__main__":
+    width, height = args.size
+    main(args.raster, args.arc, args.iarc, args.innern, width, height, 
+         args.xlim, args.ylim, args.elements, args.classdata, args.burnin, 
+         args.burnout, args.fadein, args.mfactor, args.accel, args.outdir, 
+         args.resample)
