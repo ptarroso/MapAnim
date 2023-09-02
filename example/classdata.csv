@@ -1,0 +1,15 @@
+value,description,color,target_x,target_y
+11,Tundra,#9ED7C2,2500,6000
+13,Deserts &\n Xeric Shrublands,#CC6767,4500,6000
+6,Boreal\nForests/Taiga,#7AB6F5,6500,6000
+7,Tropical &\nSubtropical Grasslands &\nSavannas & Shrublands,#FEAA01,8500,6000
+1,Tropical &\nSubtropical Moist\nBroadleaf Forests,#38A700,10500,6000
+4,Temperate Broadleaf &\nMixed Forests,#00734C,12500,6000
+8,Temperate Grasslands\nSavannas & Shrublands,#FEFF73,14500,6000
+10,Montane Grasslands &\nShrublands,#D6C39D,8500,4000
+5,Temperate Conifer\nForests,#458970,10500,4000
+2,Tropical & Subtropical\nDry Broadleaf Forests,#CCCD65,12500,4000
+12,Mediterranean Forests\nWoodlands & Scrub,#FE0000,14500,4000
+9,Flooded Grasslands &\nSavannas,#BEE7FF,10500,2000
+3,Tropical & Subtropical\nConiferous Forests,#88CE66,12500,2000
+14,Mangroves,#FE01C4,14500,2000

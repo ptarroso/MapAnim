@@ -1,0 +1,92 @@
+[
+    {
+        "type": "text",
+        "label": "The World",
+        "x": 7750,
+        "y": 7950,
+        "params": {
+            "alpha": 1,
+            "horizontalalignment": "center",
+            "color": "white",
+            "fontsize": 50,
+            "fontproperties": "./Montserrat-Light.ttf"
+        }
+    },
+    {
+        "type": "text",
+        "label": "BIOMES",
+        "x": 7750,
+        "y": 7450,
+        "params": {
+            "alpha": 1,
+            "horizontalalignment": "center",
+            "color": "white",
+            "fontsize": 80,
+            "fontproperties": "./Montserrat-SemiBold.ttf"
+        }
+    },
+    {
+        "type": "line",
+        "x": [
+            1950,
+            13550
+        ],
+        "y": [
+            7400,
+            7400
+        ],
+        "params": {
+            "linewidth": 1,
+            "color": "white"
+        }
+    },
+    {
+        "type": "classlabel",
+        "x": 0,
+        "y": -1100,
+        "params": {
+            "horizontalalignment": "center",
+            "color": "white", 
+            "fontsize": 24,
+            "fontproperties": "./Montserrat-SemiBold.ttf"
+        }
+    },
+    {
+        "type": "text",
+        "label": "Source: Dinerstein et al (2017)\nAuthor: Pedro Tarroso",
+        "x": 25,
+        "y": 50,
+        "params": {
+            "alpha": 1,
+            "color": "white",
+            "fontsize": 20,
+            "fontproperties": "./Montserrat-SemiBold.ttf"
+        }
+    },
+    {
+        "type": "scalebar",
+        "label": "5000 km",
+        "x": 25,
+        "y": 350,
+        "xsize": 1250,
+        "ysize": 50,
+        "params": {
+            "linewidth": 2,
+            "color": "white",
+            "fontsize": 20,
+            "fontproperties": "./Montserrat-SemiBold.ttf"
+        }
+    },
+    {
+        "type": "northarrow",
+        "x": 200,
+        "y": 550,
+        "size": 400,
+        "params": {
+            "linewidth": 2,
+            "color": "white",
+            "fontsize": 20,
+            "fontproperties": "./Montserrat-SemiBold.ttf"
+        }
+    }
+]
