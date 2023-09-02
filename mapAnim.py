@@ -807,7 +807,7 @@ parser.add_argument("-bi", "--burnin", type=int, default=50,
                     help="Number of frames without movement in the begining of the animation.")
 parser.add_argument("-bo", "--burnout", type=int, default=50,
                     help="Number of frames without movement at the end of the animation.")
-parser.add_argument("-f", "--fadein", type=int, default=150,
+parser.add_argument("-f", "--fadein", type=int, default=250,
                     help="Number of frames for fade in the original raster in the map.")
 parser.add_argument("-m", "--mfactor", type=float, default=1.0,
                     help="Magnitude factor for the movement of each pixel (higher value implies faster movement)")
