@@ -139,3 +139,5 @@ following command:
 python mapAnim.py -r 4 -s 3840 2160 example/biomes.tif example/classdata.csv example/elements.json frames
 ```
 
+
+![](assets/biomes.gif)
