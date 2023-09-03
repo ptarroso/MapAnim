@@ -44,8 +44,10 @@ input files:
 
 1.**Raster File**: Ideally in TIF format, this is a categorical map containing
 different classes to be animated.
+
 2.**Class Data**: A CSV file that relates values in the raster to descriptions,
 color codes, and (x, y) targets for spiral packing.
+
 3.**Elements**: A JSON file containing elements (text, lines, scale bars, north
 arrows) and customizations to be plotted alongside the map.
 
