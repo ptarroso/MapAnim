@@ -1,0 +1,11 @@
+name: mapanim
+channels:
+    - conda-forge
+    - defaults
+dependencies:
+  - python=3.11
+  - gdal
+  - pip
+  - pip:
+    - numpy >=1.24.2
+    - matplotlib >=3.6.3
