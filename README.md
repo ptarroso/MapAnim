@@ -126,8 +126,9 @@ from [Dinerstein et al (2017)](https://academic.oup.com/bioscience/article/67/6/
 The original data was converted into a raster format with a 1000-meter 
 resolution and projected to a Natural Earth projection. It's worth noting that
 this example does not provide latitude-corrected proportions (which might be 
-addressed in a future version of the script). However, it effectively 
-demonstrates the process of animating a map with the script.
+addressed in a future version of the script) with the poles showing larger 
+areas than the equator. However, it effectively demonstrates the process of 
+animating a map with the script.
 
 To better illustrate the usage of different fonts, the script uses the free
 google font Montserrat (light and semi-bold). You need to get the fonts in your
