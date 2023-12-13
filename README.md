@@ -15,7 +15,7 @@ sporadic development effort, the script lacks a structured design which
 resulted in a kind of spaghetti code. Nevertheless, it does accomplishes its 
 animating goals (although it was not fully tested)!
 
-## Instalation
+## Installation
 
 There are a few dependencies required to run the script. It necessitates a 
 working installation of Python with numpy, matplotlib, and gdal. If you have 
